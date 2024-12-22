@@ -17,3 +17,18 @@ Each row in the handle table represents a unique account that you have sent/rece
 Current:
 - Research on what the message types are
 - Splitting up message response by user.
+
+What is message type??
+- There are 71k messages with null text, 91k with non null text
+- Lets get counts of each associated_message_type
+    - 0 is the most common with 151k, Maybe this is just default text message
+    - 2: 71
+    - 3: 310
+
+
+# Get count of messages per handle starting Jan 1 2024
+SELECT handle_id, handle.id as handle_id, COUNT(message.ROWID) as message_count
+FROM message
+JOIN handle ON message.handle_id = handle.ROWID
+WHERE message.date > 725760000000000000
+GROUP BY handle.id ORDER BY "message_count" desc LIMIT 100
