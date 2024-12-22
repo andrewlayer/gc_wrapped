@@ -2,6 +2,8 @@ import sqlite3
 import os
 from pathlib import Path
 import json
+from collections import defaultdict
+from datetime import datetime, timedelta
 
 
 def load_contact_map():
@@ -14,6 +16,15 @@ def get_contact_name(sender_id: str, contact_map: dict) -> str:
         if sender_id in identifiers:
             return name
     return sender_id
+
+APPLE_EPOCH = datetime(2001, 1, 1)
+
+def apple_time_to_datetime(apple_timestamp: int) -> datetime:
+    """Convert Apple's nanosecond timestamp to Python datetime"""
+    seconds_since_epoch = (
+        apple_timestamp / 1_000_000_000
+    )  # Convert nanoseconds to seconds
+    return APPLE_EPOCH + timedelta(seconds=seconds_since_epoch)
 
 
 class MessagesDB:
@@ -76,7 +87,7 @@ class MessagesDB:
             print(f"Error fetching schema: {e}")
             return None
 
-    def get_chat_messages(self, chat_identifier: str) -> list:
+    def get_chat_messages(self, chat_identifier: str, start_date=None, end_date=None) -> list:
         """
         Get all messages from a specific group chat with sender names
         Args:
@@ -88,7 +99,9 @@ class MessagesDB:
             SELECT 
                 message.ROWID,
                 message.text,
+                message.type,
                 message.date,
+                message.is_emote,
                 message.is_from_me,
                 handle.id as sender_id
             FROM message
@@ -107,17 +120,51 @@ class MessagesDB:
             contact_map = load_contact_map()
             mapped_results = []
 
+            # Format and Filter DB Results
             for result in results:
-                row_id, text, date, is_from_me, sender_id = result
-                sender_name = (
-                    "Me" if is_from_me else get_contact_name(sender_id, contact_map)
-                )
-                mapped_results.append((row_id, text, date, is_from_me, sender_name))
+                row_id, text, type, date, is_emote, is_from_me, sender_id = result
+
+                # If the messages was sent from the db owner, there will be no associated handle.
+                # So we add "Me" to the name map for the db owner.
+                if is_from_me and sender_id is None:
+                    sender_id = "Me"
+                
+                # Only include dates within the specified daterange
+                date = apple_time_to_datetime(date)
+                if date and start_date and date.date() < start_date:
+                    continue
+                if date and end_date and date.date() > end_date:
+                    continue
+
+                sender_name = get_contact_name(sender_id, contact_map)
+                mapped_results.append({
+                    "row_id": row_id,
+                    "text": text,
+                    "type": type,
+                    "date": date,
+                    "is_emote": is_emote,
+                    "sender_name": sender_name
+                })
 
             return mapped_results
         except sqlite3.Error as e:
             print(f"Error fetching messages: {e}")
             return []
+    
+    @staticmethod
+    def get_chat_messages_by_user(chat_messages: list) -> dict:
+        """
+        'Armaan': [('Hello', '2021-01-01'), ('Hi', '2021-01-02')],
+        'Bob': [('Hey', '2021-01-03')]
+        """
+        chat_messages_by_user = defaultdict(list)
+
+        for message in chat_messages:
+            sender_name = message["sender_name"]
+            chat_messages_by_user[sender_name].append(message)
+        
+        return chat_messages_by_user
+
 
     def __enter__(self):
         self.connect()
