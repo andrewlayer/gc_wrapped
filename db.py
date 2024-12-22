@@ -1,6 +1,19 @@
 import sqlite3
 import os
 from pathlib import Path
+import json
+
+
+def load_contact_map():
+    with open("contact_map.json", "r") as f:
+        return json.load(f)
+
+
+def get_contact_name(sender_id: str, contact_map: dict) -> str:
+    for name, identifiers in contact_map.items():
+        if sender_id in identifiers:
+            return name
+    return sender_id
 
 
 class MessagesDB:
@@ -65,11 +78,11 @@ class MessagesDB:
 
     def get_chat_messages(self, chat_identifier: str) -> list:
         """
-        Get all messages from a specific group chat
+        Get all messages from a specific group chat with sender names
         Args:
             chat_identifier: The chat identifier (typically the group chat name or ID)
         Returns:
-            List of tuples containing message data or empty list if no messages found
+            List of tuples containing message data with sender names
         """
         query = """
             SELECT 
@@ -88,7 +101,20 @@ class MessagesDB:
 
         try:
             results = self.execute_query(query, (chat_identifier,))
-            return results if results else []
+            if not results:
+                return []
+
+            contact_map = load_contact_map()
+            mapped_results = []
+
+            for result in results:
+                row_id, text, date, is_from_me, sender_id = result
+                sender_name = (
+                    "Me" if is_from_me else get_contact_name(sender_id, contact_map)
+                )
+                mapped_results.append((row_id, text, date, is_from_me, sender_name))
+
+            return mapped_results
         except sqlite3.Error as e:
             print(f"Error fetching messages: {e}")
             return []
