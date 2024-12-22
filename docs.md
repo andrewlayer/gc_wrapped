@@ -14,5 +14,6 @@ Each row in the handle table represents a unique account that you have sent/rece
 - There are separate handles for a number that you have both imessaged and sms messaged with.
 
 
-
-Get Handle ID from GC
+Current:
+- Research on what the message types are
+- Splitting up message response by user.

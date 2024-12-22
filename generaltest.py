@@ -36,7 +36,7 @@ def print_first_and_last_dates():
 def print_user_message_stats():
     with MessagesDB() as db:
         full_chat_messages = db.get_chat_messages(chat_identifier=AP_SQUAD_ID)
-        messages = db.get_chat_messages_by_user(full_chat_messages)
+        messages = db.separate_messages_by_user(full_chat_messages)
 
         for user, user_messages in messages.items():
             print(user, len(user_messages))

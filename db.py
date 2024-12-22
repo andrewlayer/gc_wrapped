@@ -152,11 +152,7 @@ class MessagesDB:
             return []
     
     @staticmethod
-    def get_chat_messages_by_user(chat_messages: list) -> dict:
-        """
-        'Armaan': [('Hello', '2021-01-01'), ('Hi', '2021-01-02')],
-        'Bob': [('Hey', '2021-01-03')]
-        """
+    def separate_messages_by_user(chat_messages: list) -> dict:
         chat_messages_by_user = defaultdict(list)
 
         for message in chat_messages:
