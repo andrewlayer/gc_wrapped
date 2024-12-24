@@ -4,6 +4,9 @@ from pathlib import Path
 import json
 from collections import defaultdict
 from datetime import datetime, timedelta
+import pandas as pd
+import matplotlib.pyplot as plt
+from constants import APPLE_EPOCH
 
 
 def load_contact_map():
@@ -17,14 +20,17 @@ def get_contact_name(sender_id: str, contact_map: dict) -> str:
             return name
     return sender_id
 
-APPLE_EPOCH = datetime(2001, 1, 1)
-
 def apple_time_to_datetime(apple_timestamp: int) -> datetime:
     """Convert Apple's nanosecond timestamp to Python datetime"""
     seconds_since_epoch = (
         apple_timestamp / 1_000_000_000
     )  # Convert nanoseconds to seconds
     return APPLE_EPOCH + timedelta(seconds=seconds_since_epoch)
+
+def datetime_to_apple_time(dt: datetime) -> int:
+    """Convert Python datetime to Apple's nanosecond timestamp"""
+    seconds_since_epoch = (dt - APPLE_EPOCH).total_seconds()
+    return int(seconds_since_epoch * 1_000_000_000)
 
 
 class MessagesDB:
@@ -87,7 +93,7 @@ class MessagesDB:
             print(f"Error fetching schema: {e}")
             return None
 
-    def get_chat_messages(self, chat_identifier: str, start_date=None, end_date=None) -> list:
+    def get_chat_messages(self, chat_identifier: str, start_date=None, end_date=None, text_only=False) -> list:
         """
         Get all messages from a specific group chat with sender names
         Args:
@@ -123,6 +129,9 @@ class MessagesDB:
             # Format and Filter DB Results
             for result in results:
                 row_id, text, type, date, is_emote, is_from_me, sender_id = result
+
+                if text_only and not text:
+                    continue
 
                 # If the messages was sent from the db owner, there will be no associated handle.
                 # So we add "Me" to the name map for the db owner.

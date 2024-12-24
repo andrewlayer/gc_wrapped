@@ -8,7 +8,7 @@ from constants import AP_SQUAD_ID
 
 import pandas as pd
 
-def messages_per_period(messages_dict, period='W'):
+def participant_messages_per_period(messages_dict, period='W'):
     """
     Returns dataframe of messages per period (Week, month, year etc) per gc participant
     
@@ -45,24 +45,23 @@ def messages_per_period(messages_dict, period='W'):
     return df
 
 # Generate plot of Messages per user per week
-with MessagesDB() as db:
-    gc_messages = db.get_chat_messages(AP_SQUAD_ID, datetime.date(2024, 1, 1), datetime.date(2024, 12, 31))
-    messages_by_user = db.separate_messages_by_user(gc_messages)
-    df = messages_per_period(messages_by_user, 'W')
-    print(df)
+def generate_user_activity_plot(chat_id, period_length='W', start_date=None, end_date=None):
+    with MessagesDB() as db:
+        gc_messages = db.get_chat_messages(chat_id, start_date, end_date)
+        messages_by_user = db.separate_messages_by_user(gc_messages)
+        df = participant_messages_per_period(messages_by_user, period_length)
+        print(df.sum())
 
-    # Plot the dataframe
-    plt.figure(figsize=(10, 6))
-    for user in df.columns:
-        plt.plot(df.index, df[user], label=user)
+        # Plot the dataframe
+        plt.figure(figsize=(10, 6))
+        for user in df.columns:
+            plt.plot(df.index, df[user], label=user)
 
-    plt.xlabel('Week')
-    plt.ylabel('Number of Messages')
-    plt.title('Messages per Week by User')
-    plt.legend()
-    plt.grid(True)
-    plt.show()
+        plt.xlabel('Week')
+        plt.ylabel('Number of Messages')
+        plt.title('Messages per Week by User')
+        plt.legend()
+        plt.grid(True)
+        plt.show()
 
-
-
-
+generate_user_activity_plot(AP_SQUAD_ID, period_length='W', start_date=None, end_date=datetime.date(2021, 12, 31))

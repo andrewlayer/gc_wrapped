@@ -32,3 +32,5 @@ FROM message
 JOIN handle ON message.handle_id = handle.ROWID
 WHERE message.date > 725760000000000000
 GROUP BY handle.id ORDER BY "message_count" desc LIMIT 100
+
+fuck seeds: chat303857515224571892
