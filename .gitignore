@@ -39,3 +39,5 @@ wheels/
 # Virtual Environment
 venv/
 .env
+
+schema.md

@@ -1,4 +1,4 @@
-from db import MessagesDB
+from helpers.db import MessagesDB
 from datetime import datetime
 import sqlite3
 
