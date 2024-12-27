@@ -38,7 +38,19 @@ def main():
         #     [report],
         # )
 
-        get_embeddings(raw_messages, limit=100)
+        # Count messages with/without text
+        empty_messages = sum(1 for msg in raw_messages if msg.text is None)
+        text_messages = sum(1 for msg in raw_messages if msg.text is not None)
+        total = len(raw_messages)
+
+        print(f"\nMessage Content Analysis:")
+        print(f"Total messages: {total}")
+        print(f"Messages with text: {text_messages} ({text_messages/total*100:.1f}%)")
+        print(
+            f"Messages without text: {empty_messages} ({empty_messages/total*100:.1f}%)"
+        )
+
+        # get_embeddings(raw_messages, use_cached=False)
 
 
 if __name__ == "__main__":

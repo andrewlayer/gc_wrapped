@@ -78,71 +78,62 @@ class MessagesDB:
     def get_chat_messages(
         self, chat_identifier: Optional[str] = None, start_date=None, end_date=None
     ) -> List[Message]:
-        """
-        Return messages (and metadata) from a specific chat_identifier or, if none is provided, return messages from all chats.
-        Optionally constrain by a date range.
-        """
-        if chat_identifier:
-            query = """
-                SELECT
-                    message.ROWID,
-                    message.text,
-                    message.type,
-                    message.date,
-                    message.is_emote,
-                    message.is_from_me,
-                    handle.id as sender_id
-                FROM message
-                JOIN chat_message_join ON chat_message_join.message_id = message.ROWID
-                JOIN chat ON chat.ROWID = chat_message_join.chat_id
-                LEFT JOIN handle ON message.handle_id = handle.ROWID
-                WHERE chat.chat_identifier = ?
-                ORDER BY message.date ASC
-            """
-            results = self.execute_query(query, (chat_identifier,))
-        else:
-            query = """
-                SELECT
-                    message.ROWID,
-                    message.text,
-                    message.type,
-                    message.date,
-                    message.is_emote,
-                    message.is_from_me,
-                    handle.id as sender_id
-                FROM message
-                LEFT JOIN handle ON message.handle_id = handle.ROWID
-                ORDER BY message.date ASC
-            """
-            results = self.execute_query(query)
+        """Get messages with optional chat and date filtering"""
+        date_conditions = []
+        params = []
 
+        if chat_identifier:
+            date_conditions.append("chat.chat_identifier = ?")
+            params.append(chat_identifier)
+
+        if start_date:
+            # Convert to Apple timestamp (nanoseconds since 2001-01-01)
+            start_ns = int(
+                (start_date - datetime(2001, 1, 1)).total_seconds() * 1_000_000_000
+            )
+            date_conditions.append("message.date >= ?")
+            params.append(start_ns)
+
+        if end_date:
+            end_ns = int(
+                (end_date - datetime(2001, 1, 1)).total_seconds() * 1_000_000_000
+            )
+            date_conditions.append("message.date <= ?")
+            params.append(end_ns)
+
+        where_clause = " AND ".join(date_conditions) if date_conditions else "1=1"
+
+        query = f"""
+            SELECT
+                message.ROWID,
+                message.text,
+                message.type,
+                message.date,
+                message.is_emote,
+                message.is_from_me,
+                handle.id as sender_id
+            FROM message
+            {"JOIN chat_message_join ON chat_message_join.message_id = message.ROWID" if chat_identifier else ""}
+            {"JOIN chat ON chat.ROWID = chat_message_join.chat_id" if chat_identifier else ""}
+            LEFT JOIN handle ON message.handle_id = handle.ROWID
+            WHERE {where_clause}
+            ORDER BY message.date ASC
+        """
+
+        results = self.execute_query(query, tuple(params))
         if not results:
             return []
 
         mapped_results = []
-        for (
-            row_id,
-            text,
-            msg_type,
-            date_val,
-            is_emote,
-            is_from_me,
-            sender_id,
-        ) in results:
-            # "Me" for from_me case if handle is null
+        for res in results:
+            row_id, text, msg_type, date_val, is_emote, is_from_me, sender_id = res
             if is_from_me and sender_id is None:
                 sender_id = "Me"
+
             date_obj = apple_time_to_datetime(date_val)
-
-            # Filter by date range if given
-            if start_date and date_obj < start_date:
-                continue
-            if end_date and date_obj > end_date:
-                continue
-
             sender_name = get_contact_name(sender_id, self.contact_map)
 
-            if sender_name == None:
+            if sender_name is None:
                 continue
 
             mapped_results.append(

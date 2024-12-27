@@ -1,5 +1,7 @@
 import os
 import sqlite3
+import json
+from datetime import datetime
 from typing import List, Optional
 from tqdm import tqdm
 from helpers.db import Message
@@ -11,20 +13,6 @@ client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
 def get_embeddings(
     messages: List[Message], use_cached: bool = True, limit: Optional[int] = None
 ) -> List[Message]:
-    """
-    Checks for cached embeddings in `cached/cached.db` if use_cached=True.
-    If an embedding for a message row_id isn't found (or use_cached=False),
-    calls OpenAI to create one. Caches new embeddings in the same database.
-
-    Args:
-        messages: List of Message objects to embed
-        use_cached: Whether to skip embedding if a cached value exists
-        limit: Optional maximum number of messages to embed
-
-    Returns:
-        List of updated Message objects (with .embedding fields filled in)
-    """
-    # Ensure we have a local directory to store the cache
     project_cache_path = os.path.join(os.getcwd(), "cached")
     os.makedirs(project_cache_path, exist_ok=True)
     db_path = os.path.join(project_cache_path, "cached.db")
@@ -32,54 +20,77 @@ def get_embeddings(
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
 
-    # Create table if not exists
+    # Create table with full message schema
     cursor.execute(
         """
-        CREATE TABLE IF NOT EXISTS message_embeddings (
+        CREATE TABLE IF NOT EXISTS cached_messages (
             row_id INTEGER PRIMARY KEY,
-            embedding TEXT
+            text TEXT,
+            type INTEGER,
+            date TEXT,
+            is_emote BOOLEAN,
+            embedding TEXT,
+            sender_name TEXT
         )
-        """
+    """
     )
     conn.commit()
 
-    # Decide how many messages to embed
     sample_messages = messages[:limit] if limit is not None else messages
-
     updated_messages = []
-    # Process only the subset (limited) for embeddings
-    for msg in tqdm(sample_messages, desc="Embedding messages"):
-        row = None
+
+    for msg in tqdm(sample_messages, desc="Processing messages"):
         if use_cached:
             cursor.execute(
-                "SELECT embedding FROM message_embeddings WHERE row_id = ?",
-                (msg.row_id,),
+                """SELECT * FROM cached_messages WHERE row_id = ?""", (msg.row_id,)
             )
             row = cursor.fetchone()
 
-        if row:
-            # Cached embedding found
-            msg.embedding = row[0]
-        else:
-            # Call OpenAI to get embedding
+            if row and row[5]:
+                cached_msg = Message(
+                    row_id=row[0],
+                    text=row[1],
+                    type=row[2],
+                    date=datetime.fromisoformat(row[3]),
+                    is_emote=bool(row[4]),
+                    embedding=row[5],
+                    sender_name=row[6],
+                )
+                updated_messages.append(cached_msg)
+                continue
+
+        # Get new embedding
+
+        if msg.text:
             response = client.embeddings.create(
-                input="Your text string goes here", model="text-embedding-3-small"
+                input=msg.text or "", model="text-embedding-3-small"
             )
             emb = response.data[0].embedding
+        else:
+            emb = None
 
-            # Store embedding in DB
-            cursor.execute(
-                "INSERT OR REPLACE INTO message_embeddings (row_id, embedding) VALUES (?, ?)",
-                (msg.row_id, str(emb)),
-            )
-            conn.commit()
+        # Create new message with embedding
+        new_msg = msg.model_copy(update={"embedding": str(emb)})
 
-            msg.embedding = str(emb)
+        # Cache the full message
+        cursor.execute(
+            """INSERT OR REPLACE INTO cached_messages 
+               (row_id, text, type, date, is_emote, embedding, sender_name)
+               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            (
+                new_msg.row_id,
+                new_msg.text,
+                new_msg.type,
+                new_msg.date.isoformat(),
+                new_msg.is_emote,
+                new_msg.embedding,
+                new_msg.sender_name,
+            ),
+        )
+        conn.commit()
+        updated_messages.append(new_msg)
 
-        updated_messages.append(msg)
-
-    # Append any remaining messages unmodified (if limit was set)
-    if limit is not None and limit < len(messages):
+    if limit is not None:
         updated_messages.extend(messages[limit:])
 
     conn.close()
