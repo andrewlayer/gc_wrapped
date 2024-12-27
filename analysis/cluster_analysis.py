@@ -1,51 +1,86 @@
 import os
-import openai
-import numpy as np
-from sklearn.cluster import KMeans
+import sqlite3
+from typing import List, Optional
+from tqdm import tqdm
+from helpers.db import Message
+from openai import OpenAI
 
-def embed_messages(messages, api_key):
+client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
+
+
+def get_embeddings(
+    messages: List[Message], use_cached: bool = True, limit: Optional[int] = None
+) -> List[Message]:
     """
-    Uses OpenAI to embed a list of messages.
-    Returns a list of embedding vectors (each a Python list or np.array).
-    Note: In practice, you should handle batching & error-checking.
+    Checks for cached embeddings in `cached/cached.db` if use_cached=True.
+    If an embedding for a message row_id isn't found (or use_cached=False),
+    calls OpenAI to create one. Caches new embeddings in the same database.
+
+    Args:
+        messages: List of Message objects to embed
+        use_cached: Whether to skip embedding if a cached value exists
+        limit: Optional maximum number of messages to embed
+
+    Returns:
+        List of updated Message objects (with .embedding fields filled in)
     """
-    openai.api_key = api_key
-    embeddings = []
-    for msg in messages:
-        text = msg.get("text", "") or ""
-        if not text.strip():
-            # For empty text, append a zero vector
-            embeddings.append(np.zeros(1536))
-            continue
-        try:
-            response = openai.Embedding.create(
-                model="text-embedding-ada-002",
-                input=text
+    # Ensure we have a local directory to store the cache
+    project_cache_path = os.path.join(os.getcwd(), "cached")
+    os.makedirs(project_cache_path, exist_ok=True)
+    db_path = os.path.join(project_cache_path, "cached.db")
+
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+
+    # Create table if not exists
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS message_embeddings (
+            row_id INTEGER PRIMARY KEY,
+            embedding TEXT
+        )
+        """
+    )
+    conn.commit()
+
+    # Decide how many messages to embed
+    sample_messages = messages[:limit] if limit is not None else messages
+
+    updated_messages = []
+    # Process only the subset (limited) for embeddings
+    for msg in tqdm(sample_messages, desc="Embedding messages"):
+        row = None
+        if use_cached:
+            cursor.execute(
+                "SELECT embedding FROM message_embeddings WHERE row_id = ?",
+                (msg.row_id,),
             )
-            vector = response['data'][0]['embedding']
-            embeddings.append(np.array(vector))
-        except Exception as e:
-            print(f"OpenAI error: {e}")
-            embeddings.append(np.zeros(1536))
-    return np.array(embeddings)
+            row = cursor.fetchone()
 
-def cluster_conversations(messages, api_key, n_clusters=5):
-    """
-    Given a list of messages, embed them, then run KMeans clustering.
-    Returns a list of cluster labels (one per message).
-    """
-    data = embed_messages(messages, api_key)
-    if len(data) == 0:
-        return []
-    # Fit KMeans
-    kmeans = KMeans(n_clusters=n_clusters, random_state=42)
-    labels = kmeans.fit_predict(data)
-    return labels
+        if row:
+            # Cached embedding found
+            msg.embedding = row[0]
+        else:
+            # Call OpenAI to get embedding
+            response = client.embeddings.create(
+                input="Your text string goes here", model="text-embedding-3-small"
+            )
+            emb = response.data[0].embedding
 
-def assign_cluster_labels(messages, labels):
-    """
-    Attach the cluster label to each message for analysis.
-    """
-    for msg, cluster in zip(messages, labels):
-        msg["cluster_label"] = cluster
-    return messages 
+            # Store embedding in DB
+            cursor.execute(
+                "INSERT OR REPLACE INTO message_embeddings (row_id, embedding) VALUES (?, ?)",
+                (msg.row_id, str(emb)),
+            )
+            conn.commit()
+
+            msg.embedding = str(emb)
+
+        updated_messages.append(msg)
+
+    # Append any remaining messages unmodified (if limit was set)
+    if limit is not None and limit < len(messages):
+        updated_messages.extend(messages[limit:])
+
+    conn.close()
+    return updated_messages

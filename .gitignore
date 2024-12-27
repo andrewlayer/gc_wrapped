@@ -41,3 +41,6 @@ venv/
 .env
 
 schema.md
+
+cached/*
+!cached/cached.md

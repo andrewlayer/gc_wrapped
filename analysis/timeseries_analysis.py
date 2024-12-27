@@ -1,8 +1,11 @@
+from typing import Dict, List
 import pandas as pd
 import matplotlib.pyplot as plt
 
+from helpers.db import Message
 
-def messages_per_period(messages_dict, period="W"):
+
+def messages_per_period(messages_dict: Dict[str, List[Message]], period="W"):
     """
     Resamples message counts over a specified period:
     'D' for daily, 'W' for weekly, 'M' for monthly, etc.
@@ -13,7 +16,7 @@ def messages_per_period(messages_dict, period="W"):
     for user, messages in messages_dict.items():
         if not user:
             continue
-        user_dates = [msg["date"] for msg in messages]
+        user_dates = [msg.date for msg in messages]
         user_df = pd.DataFrame(user_dates, columns=["date"])
         user_df.set_index("date", inplace=True)
         # Resample and count
@@ -41,7 +44,7 @@ def plot_timeseries(df, title="Messages Over Time"):
             has_data = True
 
     ax.set_xlabel("Date")
-    ax.set_ylabel("Count of Messages")
+    ax.set_ylabel("# Messages")
     ax.set_title(title)
     ax.grid(True)
 

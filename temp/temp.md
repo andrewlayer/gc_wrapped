@@ -1,0 +1,1 @@
+This is the temp directory for temporary files.  This `.md` file is in the temp directory so that it is tracked by git.

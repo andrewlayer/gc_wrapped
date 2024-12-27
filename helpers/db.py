@@ -2,36 +2,31 @@ import sqlite3
 from datetime import datetime, timedelta
 import json
 from collections import defaultdict
-import os
-from pathlib import Path
+from typing import List, Optional
+from pydantic import BaseModel
+from datetime import datetime
+from typing import Optional
+from helpers.utils import apple_time_to_datetime, get_contact_name, load_contact_map
+from typing import Dict, List
 
 
-# Helper function
-def apple_time_to_datetime(apple_timestamp: int) -> datetime:
-    """
-    Convert Apple's nanosecond timestamp to Python datetime
-    """
-    APPLE_EPOCH = datetime(2001, 1, 1)
-    seconds_since_epoch = apple_timestamp / 1_000_000_000  # ns to seconds
-    return APPLE_EPOCH + timedelta(seconds=seconds_since_epoch)
+class Message(BaseModel):
+    """Single message from iMessage database"""
 
+    row_id: int
+    text: Optional[str] = None
+    type: int
+    date: datetime
+    is_emote: bool = False
+    embedding: Optional[str] = None
+    sender_name: str
 
-def load_contact_map(file_path: str) -> dict:
-    """
-    Load JSON file mapping phone numbers/emails to names
-    """
-    with open(file_path, "r") as f:
-        return json.load(f)
+    class Config:
+        frozen = False
 
-
-def get_contact_name(sender_id: str, contact_map: dict) -> str:
-    """
-    Look up the plain-text name for a given phone number/email
-    """
-    for name, identifiers in contact_map.items():
-        if sender_id in identifiers:
-            return name
-    return sender_id
+    def to_dict(self):
+        """Serialize to dictionary"""
+        return self.model_dump()
 
 
 class MessagesDB:
@@ -81,30 +76,46 @@ class MessagesDB:
             return None
 
     def get_chat_messages(
-        self, chat_identifier: str, start_date=None, end_date=None
-    ) -> list:
+        self, chat_identifier: Optional[str] = None, start_date=None, end_date=None
+    ) -> List[Message]:
         """
-        Return messages and associated metadata for a particular chat_identifier,
-        optionally constrained by a date range.
+        Return messages (and metadata) from a specific chat_identifier or, if none is provided, return messages from all chats.
+        Optionally constrain by a date range.
         """
-        query = """
-            SELECT
-                message.ROWID,
-                message.text,
-                message.type,
-                message.date,
-                message.is_emote,
-                message.is_from_me,
-                handle.id as sender_id
-            FROM message
-            JOIN chat_message_join ON chat_message_join.message_id = message.ROWID
-            JOIN chat ON chat.ROWID = chat_message_join.chat_id
-            LEFT JOIN handle ON message.handle_id = handle.ROWID
-            WHERE chat.chat_identifier = ?
-            ORDER BY message.date ASC
-        """
+        if chat_identifier:
+            query = """
+                SELECT
+                    message.ROWID,
+                    message.text,
+                    message.type,
+                    message.date,
+                    message.is_emote,
+                    message.is_from_me,
+                    handle.id as sender_id
+                FROM message
+                JOIN chat_message_join ON chat_message_join.message_id = message.ROWID
+                JOIN chat ON chat.ROWID = chat_message_join.chat_id
+                LEFT JOIN handle ON message.handle_id = handle.ROWID
+                WHERE chat.chat_identifier = ?
+                ORDER BY message.date ASC
+            """
+            results = self.execute_query(query, (chat_identifier,))
+        else:
+            query = """
+                SELECT
+                    message.ROWID,
+                    message.text,
+                    message.type,
+                    message.date,
+                    message.is_emote,
+                    message.is_from_me,
+                    handle.id as sender_id
+                FROM message
+                LEFT JOIN handle ON message.handle_id = handle.ROWID
+                ORDER BY message.date ASC
+            """
+            results = self.execute_query(query)
 
-        results = self.execute_query(query, (chat_identifier,))
         if not results:
             return []
 
@@ -122,32 +133,40 @@ class MessagesDB:
             if is_from_me and sender_id is None:
                 sender_id = "Me"
             date_obj = apple_time_to_datetime(date_val)
-            # Filter by date if range is given
+
+            # Filter by date range if given
             if start_date and date_obj < start_date:
                 continue
             if end_date and date_obj > end_date:
                 continue
 
             sender_name = get_contact_name(sender_id, self.contact_map)
+
+            if sender_name == None:
+                continue
+
             mapped_results.append(
-                {
-                    "row_id": row_id,
-                    "text": text,
-                    "type": msg_type,
-                    "date": date_obj,
-                    "is_emote": is_emote,
-                    "sender_name": sender_name,
-                }
+                Message(
+                    row_id=row_id,
+                    text=text,
+                    type=msg_type,
+                    date=date_obj,
+                    is_emote=bool(is_emote),
+                    sender_name=sender_name,
+                )
             )
+
         return mapped_results
 
     @staticmethod
-    def separate_messages_by_user(chat_messages: list) -> dict:
+    def separate_messages_by_user(
+        chat_messages: List[Message],
+    ) -> Dict[str, List[Message]]:
         """
         Splits a list of message dicts into dict-of-dicts by user
         """
         messages_by_user = defaultdict(list)
         for msg in chat_messages:
-            user = msg["sender_name"]
+            user = msg.sender_name
             messages_by_user[user].append(msg)
         return messages_by_user
