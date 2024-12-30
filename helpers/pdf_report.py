@@ -1,68 +1,60 @@
-from dataclasses import dataclass
-from typing import Union, List
-from pathlib import Path
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
+from pathlib import Path
 from PIL import Image
+from typing import List
 
 
-@dataclass
 class ReportContent:
-    """Content for a single page in the PDF report"""
-
-    content: Union[plt.Figure, Path, str]  # Figure or path to image
-    title: str
-    description: str = ""  # Optional description
+    def __init__(self, content: str | Path, title: str, description: str):
+        self.content = content
+        self.title = title
+        self.description = description
 
 
 def create_pdf_report(output_path: str, contents: List[ReportContent]) -> None:
     with PdfPages(output_path) as pdf:
         for content in contents:
-            # Create figure with more space for description
-            fig = plt.figure(figsize=(8.5, 11))
+            # Create wrapper figure
+            wrapper_fig = plt.figure(figsize=(8.5, 11))
+            gs = wrapper_fig.add_gridspec(3, 1, height_ratios=[0.5, 4, 1], hspace=0.3)
 
-            # Add title at top
-            fig.suptitle(content.title, fontsize=14, y=0.95)
+            # Add title
+            title_ax = wrapper_fig.add_subplot(gs[0])
+            title_ax.axis("off")
+            title_ax.text(
+                0.5,
+                0.5,
+                content.title,
+                horizontalalignment="center",
+                fontsize=14,
+                transform=title_ax.transAxes,
+            )
 
-            # Create subplot that leaves room for description
-            gs = fig.add_gridspec(2, 1, height_ratios=[4, 1], hspace=0.3)
+            # Add image
+            content_ax = wrapper_fig.add_subplot(gs[1])
+            img_path = Path(content.content)
+            if not img_path.exists():
+                raise FileNotFoundError(f"Image not found: {img_path}")
+            img = Image.open(img_path)
+            content_ax.imshow(img)
+            content_ax.axis("off")
 
-            # Plot content in top subplot
-            ax_plot = fig.add_subplot(gs[0])
-            if isinstance(content.content, plt.Figure):
-                temp_fig = content.content
-                for ax_orig in temp_fig.axes:
-                    for line in ax_orig.lines:
-                        ax_plot.plot(*line.get_data(), label=line.get_label())
-                    ax_plot.set_xlabel(ax_orig.get_xlabel())
-                    ax_plot.set_ylabel(ax_orig.get_ylabel())
-                    if ax_orig.get_legend():
-                        ax_plot.legend()
-            else:
-                img_path = Path(content.content)
-                if not img_path.exists():
-                    raise FileNotFoundError(f"Image not found: {img_path}")
-                img = Image.open(img_path)
-                ax_plot.imshow(img)
-                ax_plot.axis("off")
-
-            # Add description in bottom subplot
-            ax_text = fig.add_subplot(gs[1])
-            ax_text.axis("off")
+            # Add description
+            desc_ax = wrapper_fig.add_subplot(gs[2])
+            desc_ax.axis("off")
             if content.description:
-                ax_text.text(
+                desc_ax.text(
                     0.05,
                     0.8,
                     content.description,
                     wrap=True,
                     va="top",
                     fontsize=10,
-                    transform=ax_text.transAxes,
+                    transform=desc_ax.transAxes,
                 )
 
-            pdf.savefig(fig, bbox_inches="tight")
-            plt.close(fig)
-            if isinstance(content.content, plt.Figure):
-                plt.close(content.content)
+            pdf.savefig(wrapper_fig, bbox_inches="tight")
+            plt.close(wrapper_fig)
 
     print(f"PDF report saved to {output_path}")

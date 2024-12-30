@@ -1,18 +1,31 @@
+from ast import literal_eval
 import os
 import sqlite3
-import json
 from datetime import datetime
-from typing import List, Optional
+from typing import List, Optional, Tuple
+import numpy as np
+import pandas as pd
 from tqdm import tqdm
 from helpers.db import Message
 from openai import OpenAI
+from sklearn.cluster import KMeans
+from sklearn.manifold import TSNE
 
 client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
 
 
+class DeserizalizedEmbeddingMessage(Message):
+    """Single message from iMessage database"""
+
+    embedding: list[float] = None
+
+    class Config:
+        frozen = False
+
+
 def get_embeddings(
     messages: List[Message], use_cached: bool = True, limit: Optional[int] = None
-) -> List[Message]:
+) -> List[DeserizalizedEmbeddingMessage]:
     project_cache_path = os.path.join(os.getcwd(), "cached")
     os.makedirs(project_cache_path, exist_ok=True)
     db_path = os.path.join(project_cache_path, "cached.db")
@@ -37,7 +50,7 @@ def get_embeddings(
     conn.commit()
 
     sample_messages = messages[:limit] if limit is not None else messages
-    updated_messages = []
+    updated_messages: list[Message] = []
 
     for msg in tqdm(sample_messages, desc="Processing messages"):
         if use_cached:
@@ -53,7 +66,7 @@ def get_embeddings(
                     type=row[2],
                     date=datetime.fromisoformat(row[3]),
                     is_emote=bool(row[4]),
-                    embedding=row[5],
+                    embedding=row[5] if row[5] != "None" else None,
                     sender_name=row[6],
                 )
                 updated_messages.append(cached_msg)
@@ -63,7 +76,7 @@ def get_embeddings(
 
         if msg.text:
             response = client.embeddings.create(
-                input=msg.text or "", model="text-embedding-3-small"
+                input=msg.text, model="text-embedding-3-small"
             )
             emb = response.data[0].embedding
         else:
@@ -94,4 +107,31 @@ def get_embeddings(
         updated_messages.extend(messages[limit:])
 
     conn.close()
+
+    for msg in updated_messages:
+        if msg.embedding is not None:
+            msg.embedding = literal_eval(msg.embedding)
+
     return updated_messages
+
+
+def cluster_messages(
+    messages: List[DeserizalizedEmbeddingMessage], num_clusters: int = 5
+) -> Tuple[np.ndarray, np.ndarray, dict]:
+
+    embeddings = [msg.embedding for msg in messages if msg.embedding is not None]
+    messages_with_embeddings = [msg for msg in messages if msg.embedding is not None]
+
+    embeddings_df = pd.DataFrame(embeddings)
+    matrix = np.vstack(embeddings_df.values)
+    print(matrix.shape)
+
+    kmeans = KMeans(n_clusters=num_clusters, random_state=0).fit(matrix)
+    tsne = TSNE(n_components=2, random_state=0)
+    tsne_results = tsne.fit_transform(matrix)
+
+    tsne_df = pd.DataFrame(tsne_results, columns=["x", "y"])
+    tsne_df["message"] = messages_with_embeddings
+    tsne_df["cluster"] = kmeans.labels_
+
+    return tsne_results, kmeans.labels_, tsne_df.to_dict()

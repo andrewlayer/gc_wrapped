@@ -1,13 +1,11 @@
-from helpers.db import MessagesDB
+from helpers.db import Message, MessagesDB
 from analysis.timeseries_analysis import messages_per_period
 import matplotlib.pyplot as plt
-from config import AP_SQUAD_ID, CHAT_DB_PATH, CONTACT_MAP_PATH, START_DATE, END_DATE
 
 
-def plot_message_cadence(db: MessagesDB):
+def plot_message_cadence(db: MessagesDB, messages: list[Message]):
     """Generate and display plot of messages per user per week"""
-    gc_messages = db.get_chat_messages(AP_SQUAD_ID, START_DATE, END_DATE)
-    messages_by_user = db.separate_messages_by_user(gc_messages)
+    messages_by_user = db.separate_messages_by_user(messages)
     df = messages_per_period(messages_by_user, "W")
 
     plt.figure(figsize=(10, 6))
