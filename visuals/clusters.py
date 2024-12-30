@@ -1,7 +1,8 @@
 import os
-from typing import TypedDict
+from typing import Tuple
 
 from openai import OpenAI
+from pydantic import BaseModel
 from helpers.db import Message
 from analysis.embedding_analysis import cluster_messages
 import matplotlib.pyplot as plt
@@ -10,29 +11,36 @@ import numpy as np
 client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
 
 
-def _name_clusters(message_map: dict[int, Message], cluster_map: dict[int, int]) -> str:
+class ClusterMetadata(BaseModel):
+    cluster_name: str
+    cluster_quotes: list[str]
+
+
+def _name_clusters(
+    message_map: dict[int, Message], cluster_map: dict[int, int]
+) -> ClusterMetadata:
     message_clusters = {}
 
     for row_id, message in message_map.items():
         cluster = cluster_map[row_id]
         if cluster not in message_clusters:
             message_clusters[cluster] = []
-        message_clusters[cluster].append(message.text)
+        message_clusters[cluster].append(message.sender_name + ": " + message.text)
 
-    cluster_names = {}
+    cluster_metadata = {}
     for cluster, messages in message_clusters.items():
         sample_messages = np.random.choice(
             messages, size=min(100, len(messages)), replace=False
         )
 
         # Prepare prompt
-        prompt = (
-            "Based on the following messages, generate a name for this cluster:\n\n"
-        )
+        prompt = """Based on the following messages, generate a name for this cluster and 
+        put it in cluster_name.  Then choose your favorite 1-2 text qoutes and place them 
+        in cluster_quotes (be sure to preprend with the name of the sender):\n\n"""
         prompt += "\n".join(sample_messages)
 
         # Call OpenAI API
-        completion = client.chat.completions.create(
+        completion = client.beta.chat.completions.parse(
             model="gpt-4o",
             messages=[
                 {
@@ -41,18 +49,21 @@ def _name_clusters(message_map: dict[int, Message], cluster_map: dict[int, int])
                 },
                 {"role": "user", "content": prompt},
             ],
+            response_format=ClusterMetadata,
         )
 
-        cluster_names[cluster] = completion.choices[0].message.content
+        cluster_metadata[cluster] = completion.choices[0].message.parsed
 
-    return cluster_names
+    return cluster_metadata
 
 
-def plot_clusters(messages: list[Message], num_clusters: int = 5):
+def plot_clusters(
+    messages: list[Message], num_clusters: int = 5
+) -> Tuple[plt.Figure, str]:
     """Generate and display plot of clustered messages"""
     tsne_results, labels, tsne_df = cluster_messages(messages, num_clusters)
 
-    cluster_names = _name_clusters(tsne_df["message"], tsne_df["cluster"])
+    cluster_metadata = _name_clusters(tsne_df["message"], tsne_df["cluster"])
 
     fig = plt.figure(figsize=(10, 6))
     scatter = plt.scatter(
@@ -64,10 +75,26 @@ def plot_clusters(messages: list[Message], num_clusters: int = 5):
 
     # Create a legend with cluster names
     handles, _ = scatter.legend_elements()
-    legend_labels = [cluster_names[label] for label in range(num_clusters)]
+    legend_labels = [
+        cluster_metadata[label].cluster_name for label in range(num_clusters)
+    ]
     plt.legend(handles, legend_labels, title="Clusters")
 
     plt.grid(True)
     plt.tight_layout()
 
-    return fig
+    # Build the description with proper ReportLab markup
+    description = "<b>Some of the best quotes from each topic:</b>" "<br/>"
+
+    for _, metadata in cluster_metadata.items():
+        # Add cluster name with proper spacing
+        description += "<br/>" f"<b>{metadata.cluster_name}</b>" "<br/>"
+
+        # Add quotes with bullet points
+        for quote in metadata.cluster_quotes:
+            sanitized_quote = (
+                quote.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+            )
+            description += f"&bull; {sanitized_quote}<br/>"
+
+    return fig, description

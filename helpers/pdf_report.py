@@ -1,8 +1,17 @@
-import matplotlib.pyplot as plt
-from matplotlib.backends.backend_pdf import PdfPages
 from pathlib import Path
-from PIL import Image
 from typing import List
+from PIL import Image
+import re
+import markdown2
+from reportlab.lib.pagesizes import letter
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.platypus import (
+    SimpleDocTemplate,
+    Paragraph,
+    Spacer,
+    Image as ReportLabImage,
+    PageBreak,
+)
 
 
 class ReportContent:
@@ -13,48 +22,43 @@ class ReportContent:
 
 
 def create_pdf_report(output_path: str, contents: List[ReportContent]) -> None:
-    with PdfPages(output_path) as pdf:
-        for content in contents:
-            # Create wrapper figure
-            wrapper_fig = plt.figure(figsize=(8.5, 11))
-            gs = wrapper_fig.add_gridspec(3, 1, height_ratios=[0.5, 4, 1], hspace=0.3)
+    doc = SimpleDocTemplate(output_path, pagesize=letter)
+    elements = []
+    styles = getSampleStyleSheet()
 
-            # Add title
-            title_ax = wrapper_fig.add_subplot(gs[0])
-            title_ax.axis("off")
-            title_ax.text(
-                0.5,
-                0.5,
-                content.title,
-                horizontalalignment="center",
-                fontsize=14,
-                transform=title_ax.transAxes,
-            )
+    # Create custom style for descriptions
+    styles.add(
+        ParagraphStyle(
+            name="Description",
+            parent=styles["BodyText"],
+            spaceBefore=12,
+            spaceAfter=12,
+            leading=16,
+        )
+    )
 
-            # Add image
-            content_ax = wrapper_fig.add_subplot(gs[1])
-            img_path = Path(content.content)
-            if not img_path.exists():
-                raise FileNotFoundError(f"Image not found: {img_path}")
-            img = Image.open(img_path)
-            content_ax.imshow(img)
-            content_ax.axis("off")
+    for content in contents:
+        # Add title
+        title = Paragraph(content.title, styles["Title"])
+        elements.append(title)
+        elements.append(Spacer(1, 12))
 
-            # Add description
-            desc_ax = wrapper_fig.add_subplot(gs[2])
-            desc_ax.axis("off")
-            if content.description:
-                desc_ax.text(
-                    0.05,
-                    0.8,
-                    content.description,
-                    wrap=True,
-                    va="top",
-                    fontsize=10,
-                    transform=desc_ax.transAxes,
-                )
+        # Add image
+        img_path = Path(content.content)
+        if not img_path.exists():
+            raise FileNotFoundError(f"Image not found: {img_path}")
+        img = ReportLabImage(str(img_path), width=400, height=300)
+        elements.append(img)
+        elements.append(Spacer(1, 12))
 
-            pdf.savefig(wrapper_fig, bbox_inches="tight")
-            plt.close(wrapper_fig)
+        # Add description
+        if content.description:
+            html_description = markdown2.markdown(content.description)
+            description = Paragraph(html_description, styles["Description"])
+            elements.append(description)
+            elements.append(Spacer(1, 12))
 
+        elements.append(PageBreak())
+
+    doc.build(elements)
     print(f"PDF report saved to {output_path}")

@@ -38,13 +38,13 @@ def main():
 
         messages_w_embeddings = get_embeddings(raw_messages)
 
-        fig2 = plot_clusters(messages_w_embeddings)
+        fig2, description = plot_clusters(messages_w_embeddings)
         file2 = figure_to_tempfile(fig2)
 
         report2 = ReportContent(
             content=file2,
             title="Message Clusters",
-            description="This plot shows the clusters of messages based on their embeddings.",
+            description=description,
         )
 
         create_pdf_report(
