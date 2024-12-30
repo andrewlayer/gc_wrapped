@@ -1,24 +1,50 @@
-from helpers.db import Message, MessagesDB
+from collections import defaultdict
+from typing import List
+from helpers import db
+from helpers.db import Message
 from analysis.timeseries_analysis import messages_per_period
 import matplotlib.pyplot as plt
 
 
-def plot_message_cadence(db: MessagesDB, messages: list[Message]):
-    """Generate and display plot of messages per user per week"""
-    messages_by_user = db.separate_messages_by_user(messages)
-    df = messages_per_period(messages_by_user, "W")
-
-    plt.figure(figsize=(10, 6))
-    for user in df.columns:
-        plt.plot(df.index, df[user], label=user)
-
-    plt.xlabel("Week")
-    plt.ylabel("Number of Messages")
-    plt.title("Messages per Week by User")
-    plt.legend()
-    plt.grid(True)
-    plt.show()
+def separate_messages_by_sender(
+    chat_messages: list[Message],
+) -> dict[str, list[Message]]:
+    """
+    Splits a list of message dicts into dict-of-dicts by user
+    """
+    messages_by_user = defaultdict(list)
+    for msg in chat_messages:
+        user = msg.sender_name
+        messages_by_user[user].append(msg)
+    return messages_by_user
 
 
-if __name__ == "__main__":
-    plot_message_cadence()
+def plot_message_cadence(messages: list[Message], title="Messages Over Time"):
+
+    messages = separate_messages_by_sender(messages)
+    df = messages_per_period(messages, period="W")
+
+    fig, ax = plt.subplots(figsize=(10, 5))
+
+    # Validate data exists
+    if df.empty or len(df.columns) == 0:
+        print("No data to plot")
+        return fig
+
+    # Only plot columns with data
+    has_data = False
+    for col in df.columns:
+        if df[col].sum() > 0:  # Only plot if user has messages
+            ax.plot(df.index, df[col], label=col)
+            has_data = True
+
+    ax.set_xlabel("Date")
+    ax.set_ylabel("# Messages")
+    ax.set_title(title)
+    ax.grid(True)
+
+    if has_data:  # Only add legend if we plotted data
+        ax.legend(loc="upper left", bbox_to_anchor=(1, 1))
+
+    plt.tight_layout()
+    return fig

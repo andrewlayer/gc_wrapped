@@ -148,16 +148,3 @@ class MessagesDB:
             )
 
         return mapped_results
-
-    @staticmethod
-    def separate_messages_by_user(
-        chat_messages: List[Message],
-    ) -> Dict[str, List[Message]]:
-        """
-        Splits a list of message dicts into dict-of-dicts by user
-        """
-        messages_by_user = defaultdict(list)
-        for msg in chat_messages:
-            user = msg.sender_name
-            messages_by_user[user].append(msg)
-        return messages_by_user
