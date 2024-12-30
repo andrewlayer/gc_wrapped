@@ -7,6 +7,7 @@ from helpers.pdf_report import ReportContent, create_pdf_report
 from helpers.utils import figure_to_tempfile
 from visuals.clusters import plot_clusters
 from visuals.message_cadence import plot_message_cadence
+from visuals.sentiments import plot_profanity_stats
 
 load_dotenv()
 
@@ -42,9 +43,18 @@ def main():
             description=description,
         )
 
+        fig3 = plot_profanity_stats(raw_messages)
+        file3 = figure_to_tempfile(fig3)
+
+        report3 = ReportContent(
+            content=file3,
+            title="Profanity Usage",
+            description="As you can tell, Nate is a little bitch",
+        )
+
         create_pdf_report(
             PDF_OUTPUT_PATH,
-            [report, report2],
+            [report, report2, report3],
         )
 
 
