@@ -1,14 +1,12 @@
 import os
 from typing import Tuple
 
-from openai import OpenAI
 from pydantic import BaseModel
 from helpers.db import Message
+from helpers.clients import openai_client
 from analysis.embedding_analysis import cluster_messages
 import matplotlib.pyplot as plt
 import numpy as np
-
-client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
 
 
 class ClusterMetadata(BaseModel):
@@ -40,7 +38,7 @@ def _name_clusters(
         prompt += "\n".join(sample_messages)
 
         # Call OpenAI API
-        completion = client.beta.chat.completions.parse(
+        completion = openai_client.beta.chat.completions.parse(
             model="gpt-4o",
             messages=[
                 {

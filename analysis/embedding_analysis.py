@@ -10,8 +10,7 @@ from helpers.db import Message
 from openai import OpenAI
 from sklearn.cluster import KMeans
 from sklearn.manifold import TSNE
-
-client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
+from helpers.clients import openai_client
 
 
 class DeserizalizedEmbeddingMessage(Message):
@@ -24,7 +23,9 @@ class DeserizalizedEmbeddingMessage(Message):
 
 
 def get_embeddings(
-    messages: List[Message], use_cached: bool = True, limit: Optional[int] = None
+    messages: List[Message],
+    use_cached: bool = True,
+    limit: Optional[int] = None,
 ) -> List[DeserizalizedEmbeddingMessage]:
     project_cache_path = os.path.join(os.getcwd(), "cached")
     os.makedirs(project_cache_path, exist_ok=True)
@@ -75,7 +76,7 @@ def get_embeddings(
         # Get new embedding
 
         if msg.text:
-            response = client.embeddings.create(
+            response = openai_client.embeddings.create(
                 input=msg.text, model="text-embedding-3-small"
             )
             emb = response.data[0].embedding
