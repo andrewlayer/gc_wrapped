@@ -15,6 +15,7 @@ Note: This project will send all you data to OpenAI.  If you are concerned about
 - **Profanity Statistics**: Which of you friends is the most profane? This should help you find out.
 
 # Planned Features
+- [ ] TODO (lol)
 
 ## Installation
 
