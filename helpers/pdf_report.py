@@ -15,7 +15,7 @@ from reportlab.platypus import (
 
 
 class ReportContent:
-    def __init__(self, content: str, title: str, description: str):
+    def __init__(self, content: str | Path, title: str, description: str):
         self.content = content
         self.title = title
         self.description = description
