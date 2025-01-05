@@ -1,13 +1,13 @@
 from typing import List
 import matplotlib.pyplot as plt
 from helpers.db import Message
-from analysis.reaction_analysis import react_frequency
+from analysis import reaction_analysis
 
 
 def plot_reaction_stats(
     messages: List[Message], title="Reaction Usage Stats", excluded_words=None
 ):
-    reaction_data = react_frequency(messages)
+    reaction_data = reaction_analysis.react_frequency(messages)
     if not reaction_data:
         fig, ax = plt.subplots(1, 1, figsize=(10, 5))
         ax.text(0.5, 0.5, "No reaction data available", ha="center", va="center")

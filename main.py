@@ -34,18 +34,18 @@ def main():
             description="Weekly activity",
         )
 
-        # messages_w_embeddings = get_embeddings(raw_messages)
+        messages_w_embeddings = get_embeddings(raw_messages)
 
-        # fig2, description = plot_clusters(
-        #     messages_w_embeddings, num_clusters=7, ai_summary=True
-        # )
-        # file2 = figure_to_tempfile(fig2)
+        fig2, description = plot_clusters(
+            messages_w_embeddings, num_clusters=7, ai_summary=True
+        )
+        file2 = figure_to_tempfile(fig2)
 
-        # report2 = ReportContent(
-        #     content=file2,
-        #     title="Cluster analysis",
-        #     description=description,
-        # )
+        report2 = ReportContent(
+            content=file2,
+            title="Cluster analysis",
+            description=description,
+        )
 
         fig3 = plot_profanity_stats(
             raw_messages, excluded_words={"death", "hell", "damn"}
@@ -73,7 +73,7 @@ def main():
 
         create_pdf_report(
             PDF_OUTPUT_PATH,
-            [report, report3, report4]
+            [report, report2, report3, report4]
         )
 
 if __name__ == "__main__":
