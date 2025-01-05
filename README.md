@@ -6,7 +6,7 @@ Group Chat wrapped is a project written in Python to help me make fun of my frie
 
 This project was designed a little bit like a domain specific language. You can write the analysis that you want to in `main.py` in whatever order you want to produce the visuals, and the report will be generated in the same order. 
 
-Note: This project will send all you data to OpenAI.  If you are concerned about privacy, please do not use this project (or use [local-ai](https://localai.io/) like me to host models locally)
+Note: This project will send all your data to OpenAI.  If you are concerned about privacy, please do not use this project (or use [local-ai](https://localai.io/) like me to host models locally)
 
 ## Currently Supported Analysis
 
@@ -34,7 +34,7 @@ Create `contact_map.json` with the correct mappings of contact identifiers to na
 - Duplicate the `chat.db` file and paste it into the root of this project.
 
 5. **Run the Analysis**:
-This can take a while depending on the size of your chat history.  My projct with 22k messages took about 5 minutes to run.
+This can take a while depending on the size of your chat history.  My project with 22k messages took about 5 minutes to run.
 
 ## Code Structure
 
