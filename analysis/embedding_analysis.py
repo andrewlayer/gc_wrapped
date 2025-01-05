@@ -6,8 +6,7 @@ from typing import List, Optional, Tuple
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
-from helpers.db import Message
-from openai import OpenAI
+from helpers.db import Message, MessagesDB
 from sklearn.cluster import KMeans
 from sklearn.manifold import TSNE
 from helpers.clients import openai_client
@@ -22,42 +21,23 @@ class DeserizalizedEmbeddingMessage(Message):
         frozen = False
 
 
+# TODO: Make this use the same database connection as MessagesDB (or just make it make sense)
 def get_embeddings(
     messages: List[Message],
-    use_cached: bool = True,
+    use_cached_embeddings: bool = True,
     limit: Optional[int] = None,
 ) -> List[DeserizalizedEmbeddingMessage]:
-    project_cache_path = os.path.join(os.getcwd(), "cached")
-    os.makedirs(project_cache_path, exist_ok=True)
-    db_path = os.path.join(project_cache_path, "cached.db")
+    db_path = "./cached.db"
 
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
-
-    # Create table with full message schema
-    cursor.execute(
-        """
-        CREATE TABLE IF NOT EXISTS cached_messages (
-            row_id INTEGER PRIMARY KEY,
-            text TEXT,
-            type INTEGER,
-            date TEXT,
-            is_emote BOOLEAN,
-            embedding TEXT,
-            sender_name TEXT
-        )
-    """
-    )
-    conn.commit()
 
     sample_messages = messages[:limit] if limit is not None else messages
     updated_messages: list[Message] = []
 
     for msg in tqdm(sample_messages, desc="Processing messages"):
-        if use_cached:
-            cursor.execute(
-                """SELECT * FROM cached_messages WHERE row_id = ?""", (msg.row_id,)
-            )
+        if use_cached_embeddings:
+            cursor.execute("""SELECT * FROM messages WHERE row_id = ?""", (msg.row_id,))
             row = cursor.fetchone()
 
             if row and row[5]:
@@ -74,7 +54,6 @@ def get_embeddings(
                 continue
 
         # Get new embedding
-
         if msg.text:
             response = openai_client.embeddings.create(
                 input=msg.text, model="text-embedding-ada-002"
@@ -88,7 +67,7 @@ def get_embeddings(
 
         # Cache the full message
         cursor.execute(
-            """INSERT OR REPLACE INTO cached_messages 
+            """INSERT OR REPLACE INTO messages 
                (row_id, text, type, date, is_emote, embedding, sender_name)
                VALUES (?, ?, ?, ?, ?, ?, ?)""",
             (
