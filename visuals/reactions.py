@@ -33,9 +33,9 @@ def plot_reaction_stats(
     group_spacing = 2
 
     for i, sender in enumerate(senders):
-        cuss_freq = reaction_data[sender]["reaction_frequency"]
-        words = list(cuss_freq.keys())[:max_words]
-        counts = list(cuss_freq.values())[:max_words]
+        react_frequency = reaction_data[sender]["reaction_frequency"]
+        words = list(react_frequency.keys())[:max_words]
+        counts = list(react_frequency.values())[:max_words]
 
         # Pad lists if fewer than max_words
         while len(words) < max_words:
