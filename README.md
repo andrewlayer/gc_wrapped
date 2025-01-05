@@ -46,6 +46,7 @@ This can take a while depending on the size of your chat history.  My projct wit
 │   ├── embedding_analysis.py
 │   ├── sentiment_analysis.py
 │   └── timeseries_analysis.py
+│   └── reaction_analysis.py
 ├── helpers
 │   ├── clients.py
 │   ├── coverage_check.py
@@ -58,6 +59,7 @@ This can take a while depending on the size of your chat history.  My projct wit
     ├── clusters.py
     ├── message_cadence.py
     └── sentiments.py
+    └── reactions.py
 ```
 
 - **`main.py`**: Entry point for running the analysis and generating the report.

@@ -2,4 +2,8 @@ numpy
 pandas
 matplotlib
 scikit-learn
-openai 
+openai
+python-dotenv
+markdown2
+reportlab
+better_profanity

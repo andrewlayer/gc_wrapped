@@ -9,6 +9,7 @@ from helpers.utils import figure_to_tempfile
 from visuals.clusters import plot_clusters
 from visuals.message_cadence import plot_message_cadence
 from visuals.sentiments import plot_profanity_stats
+from visuals.reactions import plot_reaction_stats
 
 load_dotenv()
 
@@ -57,11 +58,23 @@ def main():
             description="Whoever is the most profane",
         )
 
-        create_pdf_report(
-            PDF_OUTPUT_PATH,
-            [report, report2, report3],
+        fig4 = plot_reaction_stats(
+            raw_messages
+        )
+        file4 = figure_to_tempfile(fig4)
+
+
+        report4 = ReportContent(
+            content=file4,
+            title="Reaction usage",
+            description="Whoever uses the most reacts",
         )
 
+
+        create_pdf_report(
+            PDF_OUTPUT_PATH,
+            [report, report2, report3, report4]
+        )
 
 if __name__ == "__main__":
     main()
