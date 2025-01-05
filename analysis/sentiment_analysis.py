@@ -4,7 +4,10 @@ from better_profanity import profanity
 from helpers.db import Message
 
 
-def profanity_freq(messages: list[Message]):
+def profanity_freq(
+    messages: list[Message], excluded_words: set = None
+) -> Dict[str, dict]:
+    # Custom list of words to exclude from profanity check
     profanity.load_censor_words()
 
     results = defaultdict(lambda: {"frequency": 0, "cuss_frequency": Counter()})
@@ -14,7 +17,11 @@ def profanity_freq(messages: list[Message]):
             continue
 
         words = message.text.lower().split()
-        profane_words = [word for word in words if profanity.contains_profanity(word)]
+        profane_words = [
+            word
+            for word in words
+            if profanity.contains_profanity(word) and word not in excluded_words
+        ]
 
         sender = message.sender_name
         results[sender]["frequency"] += len(profane_words)

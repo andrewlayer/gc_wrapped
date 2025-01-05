@@ -2,6 +2,7 @@ import os
 from datetime import datetime
 from dotenv import load_dotenv
 from analysis.embedding_analysis import get_embeddings
+from helpers.coverage_check import check_message_coverage
 from helpers.db import MessagesDB
 from helpers.pdf_report import ReportContent, create_pdf_report
 from helpers.utils import figure_to_tempfile
@@ -28,28 +29,32 @@ def main():
 
         report = ReportContent(
             content=file,
-            title="Activity",
-            description="As you can tell, the number of messages per week by user varies greatly.  Our biggest slacker in the GC is cooper, but Andrew is not far behind.",
+            title="Weekly activity",
+            description="Weekly activity",
         )
 
         messages_w_embeddings = get_embeddings(raw_messages)
 
-        fig2, description = plot_clusters(messages_w_embeddings)
+        fig2, description = plot_clusters(
+            messages_w_embeddings, num_clusters=7, ai_summary=True
+        )
         file2 = figure_to_tempfile(fig2)
 
         report2 = ReportContent(
             content=file2,
-            title="Biggest Topics",
+            title="Cluster analysis",
             description=description,
         )
 
-        fig3 = plot_profanity_stats(raw_messages)
+        fig3 = plot_profanity_stats(
+            raw_messages, excluded_words={"death", "hell", "damn"}
+        )
         file3 = figure_to_tempfile(fig3)
 
         report3 = ReportContent(
             content=file3,
-            title="Profanity Usage",
-            description="As you can tell, Nate is a little bitch",
+            title="Profanity usage",
+            description="Whoever is the most profane",
         )
 
         create_pdf_report(

@@ -45,3 +45,4 @@ schema.md
 cached/*
 !cached/cached.md
 GroupChatWrapped.pdf
+contact_map.json

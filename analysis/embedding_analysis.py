@@ -77,7 +77,7 @@ def get_embeddings(
 
         if msg.text:
             response = openai_client.embeddings.create(
-                input=msg.text, model="text-embedding-3-small"
+                input=msg.text, model="text-embedding-ada-002"
             )
             emb = response.data[0].embedding
         else:

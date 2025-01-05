@@ -4,8 +4,10 @@ from helpers.db import Message
 from analysis.sentiment_analysis import profanity_freq
 
 
-def plot_profanity_stats(messages: List[Message], title="Profanity Usage Stats"):
-    profanity_data = profanity_freq(messages)
+def plot_profanity_stats(
+    messages: List[Message], title="Profanity Usage Stats", excluded_words=None
+):
+    profanity_data = profanity_freq(messages, excluded_words)
     if not profanity_data:
         fig, ax = plt.subplots(1, 1, figsize=(10, 5))
         ax.text(0.5, 0.5, "No profanity data available", ha="center", va="center")
@@ -21,7 +23,7 @@ def plot_profanity_stats(messages: List[Message], title="Profanity Usage Stats")
     # Add labels to bars in first subplot
     bars1 = ax1.bar(senders, frequencies, label=senders)
     ax1.bar_label(bars1, padding=3)
-    ax1.set_title("Total Profanity Usage by Sender")
+    ax1.set_title(title)
     ax1.set_ylabel("Number of Profane Words")
     ax1.tick_params(axis="x", rotation=45)
 

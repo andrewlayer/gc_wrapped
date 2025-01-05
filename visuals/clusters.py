@@ -1,9 +1,9 @@
 import os
 from typing import Tuple
 
+from helpers.clients import openai_client
 from pydantic import BaseModel
 from helpers.db import Message
-from helpers.clients import openai_client
 from analysis.embedding_analysis import cluster_messages
 import matplotlib.pyplot as plt
 import numpy as np
@@ -28,7 +28,7 @@ def _name_clusters(
     cluster_metadata = {}
     for cluster, messages in message_clusters.items():
         sample_messages = np.random.choice(
-            messages, size=min(100, len(messages)), replace=False
+            messages, size=min(30, len(messages)), replace=False
         )
 
         # Prepare prompt
@@ -56,12 +56,18 @@ def _name_clusters(
 
 
 def plot_clusters(
-    messages: list[Message], num_clusters: int = 5
+    messages: list[Message], num_clusters: int = 5, ai_summary: bool = True
 ) -> Tuple[plt.Figure, str]:
     """Generate and display plot of clustered messages"""
     tsne_results, labels, tsne_df = cluster_messages(messages, num_clusters)
 
-    cluster_metadata = _name_clusters(tsne_df["message"], tsne_df["cluster"])
+    if ai_summary:
+        cluster_metadata = _name_clusters(tsne_df["message"], tsne_df["cluster"])
+    else:
+        cluster_metadata = {
+            i: ClusterMetadata(cluster_name=f"Cluster {i}", cluster_quotes=[])
+            for i in range(num_clusters)
+        }
 
     fig = plt.figure(figsize=(10, 6))
     scatter = plt.scatter(
