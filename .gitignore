@@ -25,6 +25,8 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+.venv
+.pytest_cache
 
 # Mac
 .DS_Store
