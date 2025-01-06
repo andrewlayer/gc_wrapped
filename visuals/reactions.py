@@ -14,7 +14,7 @@ def plot_reaction_stats(
         return fig
 
     # Increased figure width for legend
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(14, 10))
+    fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(14, 10))
 
     # First subplot
     senders = list(reaction_data.keys())
@@ -66,6 +66,15 @@ def plot_reaction_stats(
     # Add legends only if there's data
     if frequencies:
         ax2.legend(bbox_to_anchor=(1.05, 1), loc="upper left")
+
+    # React Percentage of Total Messages
+    percentages = reaction_analysis.get_react_percentage(messages)
+    senders = list(percentages.keys())
+    bars3 = ax3.bar(senders, percentages.values(), label=senders)
+    ax3.bar_label(bars3, padding=3)
+    ax3.set_title("React Percentages")
+    ax3.set_ylabel("Reaction Percentage")
+    ax3.tick_params(axis="x", rotation=45)
 
     # Adjust layout
     plt.tight_layout()
